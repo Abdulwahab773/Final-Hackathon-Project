@@ -3,8 +3,50 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import Link from "next/link";
+import { useState } from "react";
+import { useSignupMutation } from "@/services/authApi";
+import { useRouter } from "next/navigation";
 
 export default function SignupPage() {
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: ""
+  });
+  const [error, setError] = useState("");
+  const [signup, { isLoading }] = useSignupMutation();
+  const router = useRouter();
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+
+    if (formData.password !== formData.confirmPassword) {
+      setError("Passwords do not match!");
+      return;
+    }
+
+    try {
+      await signup({
+        name: formData.name,
+        email: formData.email,
+        password: formData.password
+      }).unwrap();
+      
+      router.push("/login");
+    } catch (err) {
+      setError(err?.data?.message || "Something went wrong. Please try again.");
+    }
+  };
+
+
+
+
   return (
     <div className="font-display bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen flex flex-col transition-colors duration-200">
       <Navbar />
@@ -46,7 +88,14 @@ export default function SignupPage() {
               <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium">Enter your details to register for a new account.</p>
             </div>
 
-            <form action="#" className="space-y-5" onSubmit={(e) => e.preventDefault()}>
+            {error && (
+              <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-xl text-red-600 dark:text-red-400 text-sm font-bold flex items-center gap-2">
+                <span className="material-symbols-outlined font-icon">error</span>
+                {error}
+              </div>
+            )}
+
+            <form className="space-y-5" onSubmit={handleSubmit}>
               <div className="flex flex-col gap-2">
                 <label className="text-sm font-bold text-slate-700 dark:text-slate-300 ml-1">Full Name</label>
                 <div className="relative group">
@@ -55,6 +104,10 @@ export default function SignupPage() {
                     className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all outline-none text-slate-900 dark:text-white"
                     placeholder="John Doe"
                     type="text"
+                    name="name"
+                    required
+                    value={formData.name}
+                    onChange={handleChange}
                   />
                 </div>
               </div>
@@ -67,6 +120,10 @@ export default function SignupPage() {
                     className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all outline-none text-slate-900 dark:text-white"
                     placeholder="name@company.com"
                     type="email"
+                    name="email"
+                    required
+                    value={formData.email}
+                    onChange={handleChange}
                   />
                 </div>
               </div>
@@ -80,6 +137,10 @@ export default function SignupPage() {
                       className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all outline-none text-slate-900 dark:text-white"
                       placeholder="••••••••"
                       type="password"
+                      name="password"
+                      required
+                      value={formData.password}
+                      onChange={handleChange}
                     />
                   </div>
                 </div>
@@ -91,21 +152,35 @@ export default function SignupPage() {
                       className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all outline-none text-slate-900 dark:text-white"
                       placeholder="••••••••"
                       type="password"
+                      name="confirmPassword"
+                      required
+                      value={formData.confirmPassword}
+                      onChange={handleChange}
                     />
                   </div>
                 </div>
               </div>
 
               <div className="flex items-start gap-3 py-2">
-                <input className="mt-1 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary" id="terms" type="checkbox" />
+                <input className="mt-1 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary" id="terms" type="checkbox" required />
                 <label className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed" htmlFor="terms">
                   I agree to the <Link className="text-primary font-bold hover:underline" href="#">Terms of Service</Link> and <Link className="text-primary font-bold hover:underline" href="#">Privacy Policy</Link>, including the processing of my healthcare data.
                 </label>
               </div>
 
-              <button className="w-full bg-primary hover:brightness-110 text-white font-bold py-4 rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2 active:scale-95" type="submit">
-                <span>Create Account</span>
-                <span className="material-symbols-outlined font-icon">arrow_forward</span>
+              <button 
+                className={`w-full bg-primary hover:brightness-110 text-white font-bold py-4 rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2 active:scale-95 ${isLoading ? "opacity-70 cursor-not-allowed" : ""}`} 
+                type="submit"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                ) : (
+                  <>
+                    <span>Create Account</span>
+                    <span className="material-symbols-outlined font-icon">arrow_forward</span>
+                  </>
+                )}
               </button>
 
             </form>
