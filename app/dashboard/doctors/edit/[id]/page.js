@@ -1,18 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useAddDoctorMutation } from "@/services/doctorApi";
+import { useParams, useRouter } from "next/navigation";
+import { useGetDoctorsQuery, useUpdateDoctorMutation } from "@/services/doctorApi";
 
-export default function AddDoctorPage() {
+export default function EditDoctorPage() {
+  const { id } = useParams();
   const router = useRouter();
-  const [addDoctor, { isLoading: isAdding }] = useAddDoctorMutation();
+  
+  const { data: doctorResponse, isLoading: isFetching } = useGetDoctorsQuery({ id });
+  const [updateDoctor, { isLoading: isUpdating }] = useUpdateDoctorMutation();
   
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    password: "",
     specialization: "",
     experience: "",
     consultationFee: "",
@@ -20,31 +22,43 @@ export default function AddDoctorPage() {
     description: ""
   });
 
+  const [availability, setAvailability] = useState([]);
 
-  const [availability, setAvailability] = useState([
-    { day: "Monday", startTime: "09:00", endTime: "17:00" }
-  ]);
-
+  useEffect(() => {
+    if (doctorResponse?.data && doctorResponse.data.length > 0) {
+      const doctor = doctorResponse.data[0];
+      setFormData({
+        name: doctor.name || "",
+        email: doctor.email || "",
+        specialization: doctor.specialization || "",
+        experience: doctor.experience || "",
+        consultationFee: doctor.consultationFee || "",
+        qualification: doctor.qualification || "",
+        description: doctor.description || ""
+      });
+      
+      if (doctor.timings) {
+        setAvailability(doctor.timings.map(t => ({
+          day: t.day.charAt(0).toUpperCase() + t.day.slice(1),
+          startTime: t.startTime,
+          endTime: t.endTime
+        })));
+      }
+    }
+  }, [doctorResponse]);
 
   const handleChange = (e) => {
     const { id, value } = e.target;
     setFormData(prev => ({ ...prev, [id]: value }));
   };
 
-
-
   const addDay = () => {
     setAvailability([...availability, { day: "Monday", startTime: "09:00", endTime: "17:00" }]);
   };
 
-
-
   const removeDay = (index) => {
     setAvailability(availability.filter((_, i) => i !== index));
   };
-
-
-
 
   const updateDay = (index, field, value) => {
     const updated = [...availability];
@@ -52,9 +66,6 @@ export default function AddDoctorPage() {
     setAvailability(updated);
   };
 
-
-
-  
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -69,18 +80,27 @@ export default function AddDoctorPage() {
         }))
       };
 
-      const res = await addDoctor(payload).unwrap();
+      const res = await updateDoctor({ id, doctor: payload }).unwrap();
       if (res.status) {
-        alert("Doctor added successfully!");
-        router.push("/dashboard/doctors");
+        alert("Doctor updated successfully!");
+        router.push(`/dashboard/doctors/${id}`);
       }
     } catch (err) {
-      console.error("Failed to add doctor:", err);
-      alert(err.data?.message || "Something went wrong while adding the doctor.");
+      console.error("Failed to update doctor:", err);
+      alert(err.data?.message || "Something went wrong while updating the doctor.");
     }
   };
 
-  
+  if (isFetching) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="flex flex-col items-center gap-2">
+          <span className="material-symbols-outlined animate-spin text-4xl text-primary font-normal">progress_activity</span>
+          <p className="font-medium text-slate-500 italic">Preparing professional details...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -89,32 +109,25 @@ export default function AddDoctorPage() {
         <div className="flex items-center gap-2 text-sm text-slate-500 mb-2 font-medium">
           <Link href="/dashboard/doctors" className="hover:text-primary transition-colors">Doctors</Link>
           <span className="material-symbols-outlined text-xs font-normal">chevron_right</span>
-          <span className="text-primary font-semibold">Add New Doctor</span>
+          <Link href={`/dashboard/doctors/${id}`} className="hover:text-primary transition-colors">{formData.name}</Link>
+          <span className="material-symbols-outlined text-xs font-normal">chevron_right</span>
+          <span className="text-primary font-semibold">Edit Credentials</span>
         </div>
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Register New Doctor</h1>
-        <p className="text-slate-500 dark:text-slate-400 mt-1 font-medium italic">Provide the professional details and schedule for the medical practitioner.</p>
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Edit Doctor Profile</h1>
+        <p className="text-slate-500 dark:text-slate-400 mt-1 font-medium italic">Update professional qualifications and availability schedule.</p>
       </div>
 
-      {/* Form Container */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
         <form onSubmit={handleSubmit} className="p-8 lg:p-10 space-y-12">
 
-          {/* Profile Photo Section */}
-          <div className="flex flex-col md:flex-row items-center gap-10">
-            <div className="relative group">
-              <div className="w-32 h-32 rounded-3xl bg-slate-50 dark:bg-slate-800 border-2 border-dashed border-slate-200 dark:border-slate-700 flex items-center justify-center overflow-hidden transition-all group-hover:border-primary/50">
-                <span className="material-symbols-outlined text-4xl text-slate-300 group-hover:text-primary transition-colors">person_add</span>
-              </div>
-              <button className="absolute -bottom-2 -right-2 bg-primary text-white p-2.5 rounded-xl shadow-lg hover:brightness-110 active:scale-90 transition-all font-normal" type="button">
-                <span className="material-symbols-outlined text-sm">photo_camera</span>
-              </button>
+          {/* Profile Section Info */}
+          <div className="flex items-center gap-6 p-6 bg-primary/5 rounded-2xl border border-primary/10">
+            <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center text-white shrink-0 shadow-lg">
+              <span className="material-symbols-outlined text-3xl font-normal">manage_accounts</span>
             </div>
-            <div className="flex-1 text-center md:text-left space-y-2">
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Doctor's Profile Photo</h3>
-              <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">JPG, PNG or WebP (Max 2MB). Recommended: 400x400px.</p>
-              <button className="mt-2 px-5 py-2 bg-primary/10 text-primary font-semibold text-[10px] rounded-xl hover:bg-primary hover:text-white transition-all uppercase tracking-widest" type="button">
-                Select from Files
-              </button>
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Professional Identity</h3>
+              <p className="text-slate-500 text-sm font-medium italic">Updating records for {formData.name}</p>
             </div>
           </div>
 
@@ -147,23 +160,23 @@ export default function AddDoctorPage() {
                   required
                 >
                   <option value="" disabled>Select a specialty</option>
-                  <option value="cardiology">Cardiology</option>
-                  <option value="dermatology">Dermatology</option>
-                  <option value="pediatrics">Pediatrics</option>
-                  <option value="neurology">Neurology</option>
-                  <option value="general_medicine">General Medicine</option>
-                  <option value="orthopedics">Orthopedics</option>
-                  <option value="gynecology">Gynecology</option>
-                  <option value="psychiatry">Psychiatry</option>
-                  <option value="ophthalmology">Ophthalmology</option>
-                  <option value="ent">ENT (Ear, Nose, Throat)</option>
-                  <option value="urology">Urology</option>
-                  <option value="gastroenterology">Gastroenterology</option>
-                  <option value="endocrinology">Endocrinology</option>
-                  <option value="pulmonology">Pulmonology</option>
-                  <option value="oncology">Oncology</option>
-                  <option value="radiology">Radiology</option>
-                  <option value="nephrology">Nephrology</option>
+                  <option value="Cardiology">Cardiology</option>
+                  <option value="Dermatology">Dermatology</option>
+                  <option value="Pediatrics">Pediatrics</option>
+                  <option value="Neurology">Neurology</option>
+                  <option value="General Medicine">General Medicine</option>
+                  <option value="Orthopedics">Orthopedics</option>
+                  <option value="Gynecology">Gynecology</option>
+                  <option value="Psychiatry">Psychiatry</option>
+                  <option value="Ophthalmology">Ophthalmology</option>
+                  <option value="ENT">ENT (Ear, Nose, Throat)</option>
+                  <option value="Urology">Urology</option>
+                  <option value="Gastroenterology">Gastroenterology</option>
+                  <option value="Endocrinology">Endocrinology</option>
+                  <option value="Pulmonology">Pulmonology</option>
+                  <option value="Oncology">Oncology</option>
+                  <option value="Radiology">Radiology</option>
+                  <option value="Nephrology">Nephrology</option>
                 </select>
                 <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none font-normal">expand_more</span>
               </div>
@@ -179,22 +192,6 @@ export default function AddDoctorPage() {
                   placeholder="jane.smith@clinic.com" 
                   type="email" 
                   value={formData.email}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1" htmlFor="password">Login Password</label>
-              <div className="relative">
-                <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-normal">lock</span>
-                <input 
-                  className="w-full pl-12 pr-5 py-3.5 bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all font-medium text-sm" 
-                  id="password" 
-                  placeholder="••••••••" 
-                  type="password" 
-                  value={formData.password}
                   onChange={handleChange}
                   required
                 />
@@ -233,14 +230,14 @@ export default function AddDoctorPage() {
               </div>
             </div>
 
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1" htmlFor="qualification">Qualification & Credentials</label>
+            <div className="space-y-2">
+              <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1" htmlFor="qualification">Qualification</label>
               <div className="relative">
                 <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-normal">school</span>
                 <input 
                   className="w-full pl-12 pr-5 py-3.5 bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all font-medium text-sm" 
                   id="qualification" 
-                  placeholder="e.g. MBBS, MD (Cardiology)" 
+                  placeholder="e.g. MBBS, MD" 
                   type="text" 
                   value={formData.qualification}
                   onChange={handleChange}
@@ -250,13 +247,13 @@ export default function AddDoctorPage() {
             </div>
 
             <div className="space-y-2 md:col-span-2">
-              <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1" htmlFor="description">About / Description</label>
+              <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1" htmlFor="description">About / Bio</label>
               <div className="relative">
                 <span className="material-symbols-outlined absolute left-4 top-5 text-slate-400 font-normal">description</span>
                 <textarea 
                   className="w-full pl-12 pr-5 py-3.5 bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all font-medium text-sm min-h-[120px] resize-none" 
                   id="description" 
-                  placeholder="Tell us about the doctor's background, expertise and achievements..." 
+                  placeholder="Doctor background details..." 
                   value={formData.description}
                   onChange={handleChange}
                   required
@@ -270,7 +267,7 @@ export default function AddDoctorPage() {
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
               <h3 className="text-base font-semibold flex items-center gap-3 text-slate-900 dark:text-white uppercase tracking-wider">
                 <span className="material-symbols-outlined text-primary font-normal">calendar_month</span>
-                Weekly Availability
+                Modify Weekly Availability
               </h3>
               <button
                 type="button"
@@ -335,34 +332,21 @@ export default function AddDoctorPage() {
 
           {/* Footer Actions */}
           <div className="flex items-center justify-end gap-4 pt-10 border-t border-slate-100 dark:border-slate-800">
-            <Link href="/dashboard/doctors" className="px-8 py-3.5 text-[10px] font-semibold text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-all uppercase tracking-widest">
-              Discard Changes
+            <Link href={`/dashboard/doctors/${id}`} className="px-8 py-3.5 text-[10px] font-semibold text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-all uppercase tracking-widest">
+              Cancel
             </Link>
             <button 
               className="px-10 py-3.5 bg-primary text-white font-semibold text-[10px] rounded-xl shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all uppercase tracking-[0.2em] flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" 
               type="submit"
-              disabled={isAdding}
+              disabled={isUpdating}
             >
-              <span className={`material-symbols-outlined text-lg font-normal ${isAdding ? 'animate-spin' : ''}`}>
-                {isAdding ? 'progress_activity' : 'save'}
+              <span className={`material-symbols-outlined text-lg font-normal ${isUpdating ? 'animate-spin' : ''}`}>
+                {isUpdating ? 'progress_activity' : 'save'}
               </span>
-              {isAdding ? 'Saving...' : 'Save Doctor'}
+              {isUpdating ? 'Updating Records...' : 'Save Changes'}
             </button>
           </div>
         </form>
-      </div>
-
-      {/* Guidelines Card */}
-      <div className="mt-10 p-6 bg-primary/5 rounded-2xl border border-primary/10 flex items-start gap-4">
-        <div className="p-2 bg-primary/10 rounded-xl">
-          <span className="material-symbols-outlined text-primary text-2xl font-light">info</span>
-        </div>
-        <div>
-          <h4 className="text-sm font-semibold text-primary uppercase tracking-widest">Registration Guidelines</h4>
-          <p className="text-xs text-slate-600 dark:text-slate-400 mt-2 leading-relaxed font-medium">
-            Ensure that the professional credentials provided match the official medical registry. Registered doctors will receive an automated invitation email to set up their clinical portal password once the profile is saved.
-          </p>
-        </div>
       </div>
     </div>
   );

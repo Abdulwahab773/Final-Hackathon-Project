@@ -1,13 +1,23 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useGetProfileQuery } from "@/services/authApi";
+import { useCreateAppointmentMutation } from "@/services/appointmentApi";
 
-export default function BookingModal({ isOpen, onClose, doctorName }) {
+export default function BookingModal({ isOpen, onClose, doctor }) {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [selectedDate, setSelectedDate] = useState(new Date()); 
-  const [selectedTime, setSelectedTime] = useState("11:00 AM");
+  const [selectedTime, setSelectedTime] = useState("");
   const [currentMonth, setCurrentMonth] = useState(new Date());          
+  const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
   
+  const { data: profileResponse } = useGetProfileQuery();
+  const profileData = profileResponse?.data || profileResponse;
+  const [createAppointment, { isLoading: isBooking }] = useCreateAppointmentMutation();
+
+  const doctorId = doctor?._id;
+
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -15,7 +25,62 @@ export default function BookingModal({ isOpen, onClose, doctorName }) {
     reason: ""
   });
 
-  // Calendar logic
+  const availableDays = useMemo(() => {
+    if (!doctor?.timings) return [];
+    return doctor.timings.map(t => t.day.toLowerCase());
+  }, [doctor]);
+
+  const timeSlots = useMemo(() => {
+    if (!doctor?.timings || !selectedDate) return [];
+    
+    const dayOfWeek = selectedDate.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase();
+    const availability = doctor.timings.find(t => t.day.toLowerCase() === dayOfWeek);
+    
+    if (!availability) return [];
+
+    const slots = [];
+    const createTimeDate = (timeStr) => {
+        const [time, modifier] = timeStr.trim().split(/\s+/);
+        let [hours, minutes] = time.split(":");
+        hours = parseInt(hours, 10);
+        if (modifier?.toUpperCase() === "PM" && hours < 12) hours += 12;
+        if (modifier?.toUpperCase() === "AM" && hours === 12) hours = 0;
+        
+        const d = new Date(selectedDate);
+        d.setHours(hours, parseInt(minutes, 10), 0, 0);
+        return d;
+    };
+
+    try {
+        let start = createTimeDate(availability.startTime);
+        const end = createTimeDate(availability.endTime);
+
+        while (start < end) {
+            let hours = start.getHours();
+            let minutes = start.getMinutes();
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12; 
+            minutes = minutes < 10 ? '0' + minutes : minutes;
+            slots.push(`${hours}:${minutes} ${ampm}`);
+            
+            start.setMinutes(start.getMinutes() + 20); // 20 min slots
+        }
+    } catch (e) {
+        console.error("Error generating slots", e);
+    }
+    
+    return slots;
+  }, [selectedDate, doctor]);
+
+  useEffect(() => {
+      if (timeSlots.length > 0 && !timeSlots.includes(selectedTime)) {
+          setSelectedTime(timeSlots[0]);
+      } else if (timeSlots.length === 0) {
+          setSelectedTime("");
+      }
+  }, [timeSlots]);
+
   const calendarDays = useMemo(() => {
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
@@ -23,12 +88,10 @@ export default function BookingModal({ isOpen, onClose, doctorName }) {
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     
     const days = [];
-    // Previous month padding
     const prevMonthLastDay = new Date(year, month, 0).getDate();
     for (let i = firstDay - 1; i >= 0; i--) {
       days.push({ day: prevMonthLastDay - i, current: false });
     }
-    // Current month days
     for (let i = 1; i <= daysInMonth; i++) {
       days.push({ day: i, current: true });
     }
@@ -39,8 +102,6 @@ export default function BookingModal({ isOpen, onClose, doctorName }) {
 
   const nextMonth = () => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() + 1)));
   const prevMonth = () => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() - 1)));
-
-  const timeSlots = ["09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM", "02:00 PM", "03:00 PM", "04:00 PM", "05:00 PM"];
 
   if (!isOpen) return null;
 
@@ -77,6 +138,16 @@ export default function BookingModal({ isOpen, onClose, doctorName }) {
 
         {/* Scrollable Content Area */}
         <div className="flex-1 overflow-y-auto custom-scrollbar p-5 sm:p-8">
+          {errorMsg && (
+            <div className="mb-4 p-3 bg-red-50 text-red-600 border border-red-200 rounded-xl text-sm font-medium">
+              {errorMsg}
+            </div>
+          )}
+          {successMsg && (
+            <div className="mb-4 p-3 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-xl text-sm font-medium">
+              {successMsg}
+            </div>
+          )}
           {step === 1 ? (
             <div className="space-y-8">
               {/* Calendar Section */}
@@ -100,13 +171,18 @@ export default function BookingModal({ isOpen, onClose, doctorName }) {
                   {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(day => (
                     <div key={day} className="text-slate-400 text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-center py-2">{day}</div>
                   ))}
-                  {calendarDays.map((d, i) => (
+                  {calendarDays.map((d, i) => {
+                    const cellDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), d.day);
+                    const cellDayName = cellDate.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase();
+                    const isAvailableDay = availableDays.includes(cellDayName);
+                    
+                    return (
                     <button 
                       key={i}
-                      disabled={!d.current}
-                      onClick={() => setSelectedDate(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), d.day))}
+                      disabled={!d.current || !isAvailableDay}
+                      onClick={() => setSelectedDate(cellDate)}
                       className={`h-10 sm:h-14 rounded-xl transition-all border border-transparent flex items-center justify-center ${
-                        !d.current ? "text-slate-300 dark:text-slate-700 pointer-events-none" : 
+                        !d.current || !isAvailableDay ? "text-slate-300 dark:text-slate-700 pointer-events-none opacity-50" : 
                         selectedDate.getDate() === d.day && selectedDate.getMonth() === currentMonth.getMonth() ? 
                         "bg-primary text-white shadow-lg shadow-primary/30 ring-4 ring-primary/10 font-bold scale-105 z-10" : 
                         "hover:bg-primary/5 dark:hover:bg-primary/10 hover:border-primary/20 text-slate-700 dark:text-slate-200"
@@ -114,7 +190,8 @@ export default function BookingModal({ isOpen, onClose, doctorName }) {
                     >
                       <span className="text-sm sm:text-base">{d.day}</span>
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -125,23 +202,27 @@ export default function BookingModal({ isOpen, onClose, doctorName }) {
                     <span className="material-symbols-outlined text-primary font-icon">schedule</span>
                     Time Slots
                   </h3>
-                  <span className="text-[10px] font-medium px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 uppercase">45 min</span>
+                  <span className="text-[10px] font-medium px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 uppercase">20 min</span>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {timeSlots.map(time => (
-                    <button 
-                      key={time}
-                      onClick={() => setSelectedTime(time)}
-                      className={`flex items-center justify-center py-3 rounded-xl border transition-all ${
-                        selectedTime === time ? 
-                        "bg-primary text-white border-primary shadow-lg ring-4 ring-primary/10" : 
-                        "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-transparent hover:border-primary/30 hover:bg-primary/10"
-                      }`}
-                    >
-                      <p className={`text-sm ${selectedTime === time ? "font-bold" : "font-semibold"}`}>{time}</p>
-                    </button>
-                  ))}
-                </div>
+                {timeSlots.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {timeSlots.map(time => (
+                      <button 
+                        key={time}
+                        onClick={() => setSelectedTime(time)}
+                        className={`flex items-center justify-center py-3 rounded-xl border transition-all ${
+                          selectedTime === time ? 
+                          "bg-primary text-white border-primary shadow-lg ring-4 ring-primary/10" : 
+                          "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-transparent hover:border-primary/30 hover:bg-primary/10"
+                        }`}
+                      >
+                        <p className={`text-sm ${selectedTime === time ? "font-bold" : "font-semibold"}`}>{time}</p>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-slate-500 text-sm p-4 bg-slate-50 dark:bg-slate-800 rounded-xl text-center">No available slots for the selected date.</p>
+                )}
               </div>
             </div>
           ) : (
@@ -211,24 +292,61 @@ export default function BookingModal({ isOpen, onClose, doctorName }) {
         {/* Action Footer */}
         <div className="shrink-0 flex items-center justify-between p-5 sm:p-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
           <button 
-            onClick={step === 1 ? onClose : () => setStep(1)}
-            className="px-5 sm:px-6 py-2.5 rounded-xl font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-700 transition-colors"
+            disabled={isBooking}
+            onClick={step === 1 ? onClose : () => { setErrorMsg(""); setStep(1); }}
+            className={`px-5 sm:px-6 py-2.5 rounded-xl font-semibold text-slate-600 dark:text-slate-400 ${isBooking ? "pointer-events-none opacity-50" : "hover:bg-slate-200/50 dark:hover:bg-slate-700"} transition-colors`}
           >
             {step === 1 ? "Cancel" : "Back"}
           </button>
           <button 
-            onClick={() => {
-              if (step === 1) setStep(2);
-              else {
-                // In a real app, you'd submit the form here
-                router.push("/booking-confirmation");
-                onClose();
+            disabled={isBooking || (step === 1 && !selectedTime)}
+            onClick={async () => {
+              if (step === 1) {
+                  if (!selectedTime) {
+                      setErrorMsg("Please select a time slot.");
+                      return;
+                  }
+                  setErrorMsg("");
+                  setStep(2);
+              } else {
+                try {
+                    setErrorMsg("");
+                    const patientId = profileData?._id; 
+                    
+                    if (!patientId) {
+                        setErrorMsg("Please log in to book an appointment.");
+                        return;
+                    }
+                    if (!doctorId) {
+                        setErrorMsg("Doctor information is missing.");
+                        return;
+                    }
+
+                    const payload = {
+                        doctorId,
+                        patientId,
+                        appointmentDate: selectedDate.toISOString(),
+                        appointmentTime: selectedTime,
+                    };
+                    
+                    const res = await createAppointment(payload).unwrap();
+                    setSuccessMsg("Appointment booked successfully!");
+                    setTimeout(() => {
+                        onClose();
+                        setSuccessMsg("");
+                        setStep(1);
+                        setFormData({ fullName: "", email: "", phone: "", reason: "" });
+                    }, 2000);
+                    
+                } catch (err) {
+                    setErrorMsg(err?.data?.message || err?.message || "Failed to book appointment. Please try again.");
+                }
               }
             }}
-            className="flex items-center gap-2 px-6 sm:px-10 py-3 sm:py-3.5 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
+            className={`flex items-center gap-2 px-6 sm:px-10 py-3 sm:py-3.5 ${isBooking || (step === 1 && !selectedTime) ? "bg-slate-400 cursor-not-allowed" : "bg-primary hover:brightness-110 active:scale-95"} text-white rounded-xl font-bold shadow-lg shadow-primary/20 transition-all`}
           >
-            <span>{step === 1 ? "Continue" : "Confirm Booking"}</span>
-            <span className="material-symbols-outlined text-xl font-icon">arrow_forward</span>
+            <span>{isBooking ? "Booking..." : step === 1 ? "Continue" : "Confirm Booking"}</span>
+            {!isBooking && <span className="material-symbols-outlined text-xl font-icon">arrow_forward</span>}
           </button>
         </div>
 

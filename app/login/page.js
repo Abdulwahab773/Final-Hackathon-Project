@@ -30,18 +30,26 @@ function LoginContent() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  
+  
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setSuccessMessage("");
 
     try {
-      await login(formData).unwrap();
-      router.push("/doctors");
+      const res = await login(formData).unwrap();
+      localStorage.setItem("token", res?.token);
+      localStorage.setItem("user", JSON.stringify(res?.data));
+      router.push("/dashboard");
+
     } catch (err) {
       setError(err?.data?.message || "Invalid email or password.");
     }
   };
+
+
+
 
   return (
     <div className="w-full max-w-[480px] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-8 lg:p-10 animate-in fade-in zoom-in-95 duration-700">
