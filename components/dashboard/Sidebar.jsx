@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard/overview", icon: "dashboard" },
@@ -13,6 +13,7 @@ const navigation = [
 
 export default function Sidebar({ isOpen, setIsOpen }) {
   const pathname = usePathname();
+  const router = useRouter();
 
   return (
     <>
@@ -69,7 +70,10 @@ export default function Sidebar({ isOpen, setIsOpen }) {
         <div className="p-4 border-t border-slate-200 dark:border-slate-800 space-y-1">
           <button 
             className="w-full flex cursor-pointer items-center gap-3 px-3 py-2.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors group"
-            onClick={() => console.log("Sign Out")}
+            onClick={() => {
+              localStorage.removeItem("token");
+              router.push("/login");
+            }}
           >
             <span className="material-symbols-outlined group-hover:-translate-x-1 transition-transform">logout</span>
             <span className="font-semibold text-sm">Sign Out</span>

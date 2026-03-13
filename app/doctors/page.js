@@ -1,78 +1,23 @@
+"use client"
+
+
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import DoctorCard from "@/components/DoctorCard";
+import { useGetDoctorsQuery } from "@/services/doctorApi";
 
 export default function DoctorsPage() {
-  const doctors = [
-    {
-      name: "Dr. Sarah Jenkins",
-      specialty: "Cardiology",
-      rating: "4.9",
-      reviews: "120",
-      experience: "12",
-      title: "Heart Specialist",
-      price: "120",
-      img: "https://lh3.googleusercontent.com/aida-public/AB6AXuAA8PKAUVxejb61-Oin08Jc3KYAiChuC2HDouuN8B6PUQ7zxUdd9P8cJaAxcdngVEjl0vV4OeFaggjyYGscXSe4gA5hRJ_JEZxgoXkv6kPjAuPbZR1c504NNzNumSbXs5E5UYIYqNASdjjbEG7LMEf9kSzCMkklME491RQm_Rh3wp8J9vK71mnFH49Gz30TcaOFzJSflAoc3KkztbWvDfTIf1Q9MzqoUg2m9Dnh4EAZttk6H4x_f6LPi0Ts4rxeJ0WjykY-e_3CkGg"
-    },
-    {
-      name: "Dr. Michael Chen",
-      specialty: "Neurology",
-      rating: "4.8",
-      reviews: "85",
-      experience: "15",
-      title: "Neurosurgeon",
-      price: "150",
-      img: "https://lh3.googleusercontent.com/aida-public/AB6AXuCi7XA3XbhEFJErMU8s19PbaldxeJmVFRbocJF7p-jr39o9vy0RRMBBC_G-01OQJQXBGvV5CMkVnNt19cfrV7kMeBpTLxsKXL4RkJdJWPxUdxK-DF-Wy51Pp9OnLMI0yWR6y55a_2MwxmZ4OQKtzr5alSXd1m0bWYQXmPYtehIpEDNEyx_5YQoPhh2yFDbsSrmOlcR7MZX-t3_FTZ0NRETpMcCLH0cR33beRtFxNUUYukJGkTz1bLhU5JQB6JNGyg5VS4mhosiOJBQ"
-    },
-    {
-      name: "Dr. Elena Rodriguez",
-      specialty: "Pediatrics",
-      rating: "5.0",
-      reviews: "210",
-      experience: "8",
-      title: "Child Specialist",
-      price: "95",
-      img: "https://lh3.googleusercontent.com/aida-public/AB6AXuBieJ_az4YR7yAnc1yySiHrHY8G-UhbTLPxKpYGy0yAk3aXKCqZE2Jkk8m2icavCshk2l4QCBzM7MgoErY_p9xL5VA9-g-C1BLACubuHU54R8JptFFOHkMAPnquEoLD55gNNPvREcBG8_AZCOBA6wSeYB_LAi4N3j7v3d6iAiSlGzABSGZSDZv3of5KwPZqeH_bI2HpE_QC6tE0dDKXFNGLaGIIXtsJC0S01tY7jRp-cNb4cLYKbkNC1VC8K1ZyEc8nFQzpEjZ6TX8"
-    },
-    {
-      name: "Dr. James Wilson",
-      specialty: "Orthopedics",
-      rating: "4.7",
-      reviews: "54",
-      experience: "20",
-      title: "Bone & Joint Expert",
-      price: "180",
-      img: "https://lh3.googleusercontent.com/aida-public/AB6AXuCe-xyiGgVq1qszUf_OQbDRx-eIe-uOVIDL7HTaIsKekxoWYkImAzzjF3IDe0ZRTzbZHTGoDNBwZ3JbSxj_K5d6pjrYkdUPCHyLQagmvYXCZ5nIweBTiwxi7E8yk7Y1tv76ulL5T4DzwflO0M6wL8J7HLx1VU_fgybKcaw5fwUGTL85S6ftk7BaP3vUiQB__9CXlw38RX4Ps-GXjQGANxodT1RTelyUIHsdTWUmY-lpz2NOTd1bGayPMRCiF6tQ8SbNxK-em40ILvA"
-    },
-    {
-      name: "Dr. Maya Patel",
-      specialty: "Dermatology",
-      rating: "4.9",
-      reviews: "142",
-      experience: "10",
-      title: "Skin & Laser Specialist",
-      price: "110",
-      img: "https://lh3.googleusercontent.com/aida-public/AB6AXuCBNa-tY9lpCE9pdEGk7nfgfpAgsONldlqry4blcgPGd2eKt-X-mhzYDC-WN7bakq_nYDoSm0G1b1nYF6IHHrWEPh00cS_5u6slPworhQiLDUubQ2Ifb2_9rVCTCSrv2c7eqh9sHDpH-0OCHe5ueR4tlEbzzIH_7xba1kpaSv-gDBbSSG9VbwLhPdyKmgGH0Nq2oTrUULaNG5p9vOv-cCFRgzRePG3sb6hXiFegqXTPQgDDNaxZG65GIm56Kd1iAhKTjFT-dH0GRZQ"
-    },
-    {
-      name: "Dr. Robert Vance",
-      specialty: "Psychiatry",
-      rating: "4.6",
-      reviews: "42",
-      experience: "18",
-      title: "Mental Health Expert",
-      price: "140",
-      img: "https://lh3.googleusercontent.com/aida-public/AB6AXuDbCaSolmhLFWgS249750YXDi5h5hEb6eALZXOdK5X89l373aitjF-xXaRpgcOLYt7fMlon2niOTPECXOPY5Nd_tq3mhacrzhXNnvLVclZ1BFlshG8DXixhCfjTw7ikWt_h-pxUkBMPBYg2YoH8QEIeJXl7sGQmco8ySRKGGx2YGIVgazQ6Bxgm1U6KOtYVtOG0uSNqblENKsPA7D0xGK4x43V6t99cCeNzy6JBE7bpMUf8oI-xamgfRumkfxeV31s-qx8tcL2MdOQ"
-    }
-  ];
+  const { data: doctorResponse, isLoading } = useGetDoctorsQuery();
+  
+  const activeDoctors = doctorResponse?.data?.filter(doc => doc.isActive !== false) || [];
 
-  const specialties = ["All Specializations", "Cardiology", "Dermatology", "Pediatrics", "Neurology", "Orthopedics"];
+  const specialties = ["All Specializations", "Cardiology", "Dermatology", "Pediatrics", "Neurology", "Orthopedics", "General Medicine", "Psychiatry"];
 
   return (
     <div className="flex min-h-screen flex-col">
       <Navbar />
-      <main className="flex flex-col flex-1 max-w-7xl mx-auto w-full px-6 md:px-20 py-10 text-slate-900 dark:text-slate-100">
+      <main className="flex flex-col flex-1 max-w-8xl mx-auto w-full px-6 md:px-20 py-10 text-slate-900 dark:text-slate-100">
         <div className="flex flex-col gap-6 mb-10">
           <div className="flex flex-col gap-2">
             <h1 className="text-slate-900 dark:text-white text-4xl md:text-5xl font-black leading-tight tracking-tight">Find a Specialist</h1>
@@ -105,9 +50,24 @@ export default function DoctorsPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {doctors.map((doctor, index) => (
-            <DoctorCard key={index} doctor={doctor} />
-          ))}
+          {isLoading ? (
+            <div className="col-span-full py-20 flex flex-col items-center justify-center gap-4">
+              <span className="material-symbols-outlined animate-spin text-5xl text-primary font-light">progress_activity</span>
+              <p className="text-slate-500 font-medium">Loading specialist directory...</p>
+            </div>
+          ) : activeDoctors.length > 0 ? (
+            activeDoctors.map((doctor) => (
+              <DoctorCard key={doctor._id || doctor.id} doctor={doctor} />
+            ))
+          ) : (
+            <div className="col-span-full py-20 flex flex-col items-center justify-center gap-4 text-center">
+              <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center">
+                <span className="material-symbols-outlined text-4xl text-slate-400 font-light">group_off</span>
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white mt-2">No Specialists Found</h3>
+              <p className="text-slate-500 max-w-md">We couldn't find any active doctors at the moment. Please check back later or modify your search criteria.</p>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-center gap-2 mt-12">
